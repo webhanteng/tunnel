@@ -1,3 +1,8 @@
+## 📄 License
+
+This project is licensed under the MIT License.  
+See the [LICENSE](./LICENSE) file for details.
+
 Tunnel 是一个基于 Java/Netty/Spring Boot 的内网穿透代理
 支持 HTTP 全透传、WebSocket 隧道、多客户端路由及可管理 UI。
 适用于云桌面网络隔离场景。
