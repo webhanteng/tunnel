@@ -1,0 +1,6 @@
+server:
+  port: 9001
+
+tunnel:
+  ws-path: /ws
+  gateway-path: /gateway

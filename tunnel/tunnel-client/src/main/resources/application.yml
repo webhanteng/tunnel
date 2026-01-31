@@ -1,0 +1,6 @@
+server:
+  port: 9000
+
+tunnel:
+  server-ws: ws://127.0.0.1:9001/ws?route=test
+  local-backend: http://127.0.0.1:8080
