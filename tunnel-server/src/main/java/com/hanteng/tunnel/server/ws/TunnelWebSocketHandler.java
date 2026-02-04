@@ -7,13 +7,11 @@ import com.hanteng.tunnel.server.registry.RouteRegistry;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-import org.springframework.web.socket.CloseStatus;
-import org.springframework.web.socket.TextMessage;
-import org.springframework.web.socket.WebSocketSession;
-import org.springframework.web.socket.handler.TextWebSocketHandler;
+import org.springframework.web.socket.*;
+import org.springframework.web.socket.handler.AbstractWebSocketHandler;
 
 @Component
-public class TunnelWebSocketHandler extends TextWebSocketHandler {
+public class TunnelWebSocketHandler extends AbstractWebSocketHandler {
 
     @Autowired
     private RouteRegistry registry;
@@ -50,6 +48,20 @@ public class TunnelWebSocketHandler extends TextWebSocketHandler {
             }
         } catch (Exception e) {
             System.err.println("Failed to parse message: " + e.getMessage());
+        }
+    }
+
+    @Override
+    protected void handleBinaryMessage(WebSocketSession session, BinaryMessage message) throws Exception {
+        try {
+            byte[] payload = message.getPayload().array();
+            TunnelResponse response = objectMapper.readValue(payload, TunnelResponse.class);
+            ClientSession clientSession = findClientSession(session);
+            if (clientSession != null) {
+                clientSession.handleResponse(response);
+            }
+        } catch (Exception e) {
+            System.err.println("Failed to parse binary message: " + e.getMessage());
         }
     }
 

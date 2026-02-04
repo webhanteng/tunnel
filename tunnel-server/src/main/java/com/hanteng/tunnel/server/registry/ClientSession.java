@@ -5,6 +5,7 @@ import com.hanteng.tunnel.server.protocol.TunnelResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.socket.BinaryMessage;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 
@@ -74,8 +75,14 @@ public class ClientSession {
         pendingRequests.put(requestId, future);
 
         try {
-            String json = objectMapper.writeValueAsString(tunnelRequest);
-            session.sendMessage(new TextMessage(json));
+            byte[] requestBytes = objectMapper.writeValueAsBytes(tunnelRequest);
+            if (requestBytes.length > 1024 * 1024) { // 超过 1MB 使用二进制消息
+                System.out.println("Sending large request as binary message: " + requestBytes.length + " bytes");
+                session.sendMessage(new BinaryMessage(requestBytes));
+            } else {
+                System.out.println("Sending small request as text message: " + requestBytes.length + " bytes");
+                session.sendMessage(new TextMessage(requestBytes));
+            }
 
             return future.get(30, TimeUnit.SECONDS);
         } catch (Exception e) {

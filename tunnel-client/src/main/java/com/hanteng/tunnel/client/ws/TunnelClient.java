@@ -12,10 +12,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
-import org.springframework.web.socket.TextMessage;
-import org.springframework.web.socket.WebSocketSession;
+import org.springframework.web.socket.*;
 import org.springframework.web.socket.client.standard.StandardWebSocketClient;
-import org.springframework.web.socket.handler.TextWebSocketHandler;
+import org.springframework.web.socket.handler.AbstractWebSocketHandler;
 
 import javax.annotation.PostConstruct;
 import java.time.LocalDateTime;
@@ -24,7 +23,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 @Component
-public class TunnelClient extends TextWebSocketHandler {
+public class TunnelClient extends AbstractWebSocketHandler {
 
     @Value("${tunnel.server-ws}")
     String wsUrl;
@@ -94,9 +93,7 @@ public class TunnelClient extends TextWebSocketHandler {
             System.out.println("[" + getTimestamp() + "] 📥 Received response from local backend");
             System.out.println("[" + getTimestamp() + "] 📋 Status: " + response.getStatus());
 
-            String jsonResponse = objectMapper.writeValueAsString(response);
-            session.sendMessage(new TextMessage(jsonResponse));
-            System.out.println("[" + getTimestamp() + "] 📤 Sent response back to server");
+            sendResponse(session, response);
         } catch (Exception e) {
             System.err.println("[" + getTimestamp() + "] ❌ Failed to handle request: " + e.getMessage());
             e.printStackTrace();
@@ -104,7 +101,40 @@ public class TunnelClient extends TextWebSocketHandler {
     }
 
     @Override
-    public void afterConnectionClosed(WebSocketSession session, org.springframework.web.socket.CloseStatus status) {
+    protected void handleBinaryMessage(WebSocketSession session, BinaryMessage message) throws Exception {
+        try {
+            byte[] payload = message.getPayload().array();
+            TunnelRequest request = objectMapper.readValue(payload, TunnelRequest.class);
+            System.out.println("[" + getTimestamp() + "] 📥 Received binary message from server");
+            System.out.println("[" + getTimestamp() + "] 📋 Request ID: " + request.getRequestId());
+            System.out.println("[" + getTimestamp() + "] 📋 Method: " + request.getMethod());
+            System.out.println("[" + getTimestamp() + "] 📋 Path: " + request.getPath());
+            System.out.println("[" + getTimestamp() + "] 📋 Forwarding to local backend: " + backend);
+
+            TunnelResponse response = handleRequest(request);
+            System.out.println("[" + getTimestamp() + "] 📥 Received response from local backend");
+            System.out.println("[" + getTimestamp() + "] 📋 Status: " + response.getStatus());
+
+            sendResponse(session, response);
+        } catch (Exception e) {
+            System.err.println("[" + getTimestamp() + "] ❌ Failed to handle binary request: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    private void sendResponse(WebSocketSession session, TunnelResponse response) throws Exception {
+        byte[] responseBytes = objectMapper.writeValueAsBytes(response);
+        if (responseBytes.length > 1024 * 1024) { // 超过 1MB 使用二进制消息
+            System.out.println("[" + getTimestamp() + "] 📤 Sending large response as binary message: " + responseBytes.length + " bytes");
+            session.sendMessage(new BinaryMessage(responseBytes));
+        } else {
+            System.out.println("[" + getTimestamp() + "] 📤 Sending small response as text message: " + responseBytes.length + " bytes");
+            session.sendMessage(new TextMessage(responseBytes));
+        }
+    }
+
+    @Override
+    public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
         System.out.println("[" + getTimestamp() + "] ❌ Connection closed: " + status.getReason());
         System.out.println("[" + getTimestamp() + "] Reconnecting...");
         connect();
